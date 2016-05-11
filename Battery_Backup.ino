@@ -9,7 +9,7 @@ Analog reference. For Battery measurement we are using VCC as reference, but for
 
 */
 
-#include "oXs_BB_config.h"
+#include "BB_config.h"
 
 byte batt1_ok = 0;	// Stattus for Battery 1. 0 - not detected; 1 - battery is OK
 byte batt2_ok = 0;	// Stattus for Battery 2. 0 - not detected; 1 - battery is OK
