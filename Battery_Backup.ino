@@ -9,7 +9,7 @@ Analog reference. For Battery measurement we are using VCC as reference, but for
 
 */
 
-#include "BB_config.h"
+#include "oXs_BB_config.h"
 
 byte batt1_ok = 0;	// Stattus for Battery 1. 0 - not detected; 1 - battery is OK
 byte batt2_ok = 0;	// Stattus for Battery 2. 0 - not detected; 1 - battery is OK
@@ -32,11 +32,11 @@ float batt2_voltage = 0;
 	float bec2_voltage = 0;
 #endif
 
-
-
-
-
-
+#define filterSamples   13              // filterSamples should  be an odd number, no smaller than 3
+int batt1_voltage_SmoothArray [filterSamples];   // array for holding raw sensor values for Pressure sensor 
+int batt2_voltage_SmoothArray [filterSamples];   // array for holding raw sensor values for Pressure sensor 
+int bec1_voltage_SmoothArray [filterSamples];   // array for holding raw sensor values for Pressure sensor 
+int bec2_voltage_SmoothArray [filterSamples];   // array for holding raw sensor values for Pressure sensor 
 unsigned int analog_read = 0;
 //byte battery_in_use = 1;// 1 - Main battery is connected; 2 - secondary battery is connected
 byte state = state_INIT;
@@ -53,7 +53,7 @@ void setup()
 {
 #ifdef DEBUG 
 	Serial.begin(57600); 
-	delay(1000);
+	delay(5000);
 	Serial.println(F("*** OXS Battery Backup V1.0 ***"));	// welcome screen
 #endif 
 	// Backup battery should be connected at the beginning
@@ -61,15 +61,14 @@ void setup()
 	TURN_MOSFET_2_ON; // first set state of the pin (enable or disable pullup resistor)
 	pinMode(PIN_BATT_M1, OUTPUT);	// and then set pin direction
 	pinMode(PIN_BATT_M2, OUTPUT);	// and then set pin direction
-	for(byte i=0;i<100;i++){analog_read = analogRead(PIN_BATT_A1);delay(1);}	// discard first readings to let Analog reference voltage to stabilize
-
-
-
-
-
-
-
-
+	// discard first readings to let Analog reference voltage to stabilize and to fill smooth array
+	for(byte i=0;i<60;i++){
+		analog_read = digitalSmooth(analogRead(PIN_BATT_A1), batt1_voltage_SmoothArray);
+		analog_read = digitalSmooth(analogRead(PIN_BATT_A2), batt2_voltage_SmoothArray);
+		analog_read = digitalSmooth(analogRead(PIN_BEC_A1), bec1_voltage_SmoothArray);
+		analog_read = digitalSmooth(analogRead(PIN_BEC_A2), bec2_voltage_SmoothArray);
+		delay(1);
+	}	
 	time_INIT = millis(); //Initialize the time counter for initialization step.
 
 #ifdef DEBUG 
@@ -81,13 +80,12 @@ void loop()
 {
 	// read analog inputs (Battery voltages)
 	//analogReference(DEFAULT);	// 5V. 
-	//for(byte i=0;i<20;i++){analog_read = analogRead(PIN_BATT_A1);}	// discard first readings to let Analog reference voltage stabilize
-
-	analog_read = getADCValueFromPIN(PIN_BATT_A1);
+	analog_read = digitalSmooth(analogRead(PIN_BATT_A1), batt1_voltage_SmoothArray);
+	//analog_read = getADCValueFromPIN(PIN_BATT_A1);
 	//analog_read = analogRead(PIN_BATT_A1);
 	batt1_voltage = (((float)analog_read/1024.0) * VrefBATT) / BATT_V1_div + BATT1_V_OFFSET; 
-
-	analog_read = getADCValueFromPIN(PIN_BATT_A2);
+	analog_read = digitalSmooth(analogRead(PIN_BATT_A2), batt2_voltage_SmoothArray);
+	//analog_read = getADCValueFromPIN(PIN_BATT_A2);
 	//analog_read = analogRead(PIN_BATT_A2);
 	batt2_voltage = (((float)analog_read/1024.0) * VrefBATT) / BATT_V2_div + BATT2_V_OFFSET; 
   	// check voltages and update variables accordingly 
@@ -98,10 +96,10 @@ void loop()
 	#ifdef WITHBEC
 		//analogReference(INTERNAL);	// 1.1V. 
 		//for(byte i=0;i<20;i++){analog_read = analogRead(PIN_BEC_A1);}	// discard first readings to let Analog reference voltage stabilize
-		analog_read = getADCValueFromPIN(PIN_BEC_A1);
+		analog_read = digitalSmooth(analogRead(PIN_BEC_A1), bec1_voltage_SmoothArray);
 		//analog_read = analogRead(PIN_BEC_A1);
 		bec1_voltage = (((float)analog_read/1024.0) * VrefBEC) / BEC_V1_div + BEC1_V_OFFSET; 
-		analog_read = getADCValueFromPIN(PIN_BEC_A2);
+		analog_read = digitalSmooth(analogRead(PIN_BEC_A2), bec2_voltage_SmoothArray);
 		//analog_read = analogRead(PIN_BEC_A2);
 		bec2_voltage = (((float)analog_read/1024.0) * VrefBEC) / BEC_V2_div + BEC2_V_OFFSET; 
 	  	// check voltages and update variables accordingly 
@@ -249,7 +247,7 @@ switch (state) {
 
 }
 
-
+/*
 unsigned int getADCValueFromPIN(byte aPin) {
 	unsigned int areadscount = 0;
 	for(byte i=0;i<64;i++){areadscount += analogRead(aPin);}
@@ -257,45 +255,45 @@ unsigned int getADCValueFromPIN(byte aPin) {
 	return areadscount;
 	
 }
+*/
 
+// smooth algorytm for ADC reading
+int digitalSmooth(int rawIn, int *sensSmoothArray){     // "int *sensSmoothArray" passes an array to the function - the asterisk indicates the array name is a pointer
+  int j, k, temp, top, bottom;
+  long total;
+  static int i;
+  static int sorted[filterSamples];
+  boolean done;
 
+  i = (i + 1) % filterSamples;    // increment counter and roll over if necc. -  % (modulo operator) rolls over variable
+  sensSmoothArray[i] = rawIn;                 // input new data into the oldest slot
 
+  for (j=0; j<filterSamples; j++){     // transfer data array into anther array for sorting and averaging
+    sorted[j] = sensSmoothArray[j];
+  }
 
+  done = 0;                // flag to know when we're done sorting              
+  while(done != 1){        // simple swap sort, sorts numbers from lowest to highest
+    done = 1;
+    for (j = 0; j < (filterSamples - 1); j++){
+      if (sorted[j] > sorted[j + 1]){     // numbers are out of order - swap
+        temp = sorted[j + 1];
+        sorted [j+1] =  sorted[j] ;
+        sorted [j] = temp;
+        done = 0;
+      }
+    }
+  }
 
+  // throw out top and bottom 15% of samples - limit to throw out at least one from top and bottom
+  bottom = max(((filterSamples * 15)  / 100), 1); 
+  top = min((((filterSamples * 85) / 100) + 1  ), (filterSamples - 1));   // the + 1 is to make up for asymmetry caused by integer rounding
+  k = 0;
+  total = 0;
+  for ( j = bottom; j< top; j++){
+    total += sorted[j];  // total remaining indices
+    k++; 
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  return total / k;    // divide by number of samples
+}
