@@ -60,6 +60,9 @@ void setup()
 	TURN_MOSFET_2_ON; // first set state of the pin (enable or disable pullup resistor)
 	pinMode(PIN_BATT_M1, OUTPUT);	// and then set pin direction
 	pinMode(PIN_BATT_M2, OUTPUT);	// and then set pin direction
+	#ifdef BACKUPLED
+		pinMode(PIN_LED_M2, OUTPUT);	// and then set pin direction for LED if used
+	#endif
 	time_INIT = millis(); // Start a timer for counting 500ms after BECs on, to get caps charged :)
 	// discard first readings to let Analog reference voltage to stabilize and to fill smooth array
 	for(byte i=0;i<30;i++){
