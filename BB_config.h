@@ -11,10 +11,10 @@
 #define PIN_BEC_A2       A1    // Analog input from voltage divider from Receiver (Arduino) voltage secondary
 
 // Digital pins for Battery MOSFETS
-#define PIN_BATT_M1		3	// Mosfet are controlled in inverse eg ON=0, OFF=1
+#define PIN_BATT_M1		3	// Mosfet are controlled ON=1, OFF=0
 #define PIN_BATT_M2		6	// Mosfet are controlled in inverse eg ON=0, OFF=1
 #ifdef BACKUPLED
-	#define PIN_LED_M2	13	// Mosfet outputs are works in invert. So, here is parrallel pin for LED to be used by human eye :)
+	#define PIN_LED_M2	13	// Mosfet2 are works in invert. So, here is parrallel pin for LED to be used by human eye :)
 #endif
 
 // Voltage dividers for Battery and BEC voltage sensing
@@ -66,8 +66,8 @@
 #define IS_MOSFET_1_OFF   (digitalRead(PIN_BATT_M1) == LOW)
 
 #ifdef BACKUPLED
-	#define TURN_MOSFET_2_ON  {digitalWrite(PIN_BATT_M2, HIGH);digitalWrite(PIN_LED_M2, LOW);}
-	#define TURN_MOSFET_2_OFF {digitalWrite(PIN_BATT_M2, LOW);digitalWrite(PIN_LED_M2, HIGH);}
+	#define TURN_MOSFET_2_ON  {digitalWrite(PIN_BATT_M2, LOW);digitalWrite(PIN_LED_M2, HIGH);}
+	#define TURN_MOSFET_2_OFF {digitalWrite(PIN_BATT_M2, HIGH);digitalWrite(PIN_LED_M2, LOW);}
 #else
 	#define TURN_MOSFET_2_ON  digitalWrite(PIN_BATT_M2, LOW);
 	#define TURN_MOSFET_2_OFF digitalWrite(PIN_BATT_M2, HIGH);
